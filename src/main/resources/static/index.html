@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Ocean View Resort</title>
+
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+
+    <style>
+        body {
+            background: linear-gradient(to right, #141e30, #243b55);
+            color: white;
+        }
+        .card { border-radius: 15px; }
+        .navbar { background: #000; }
+    </style>
+
+</head>
+
+<body>
+
+<!-- NAVBAR -->
+<nav class="navbar navbar-dark">
+    <div class="container-fluid">
+        <span class="navbar-brand">🌊 Ocean View Resort</span>
+        <div>
+            <button class="btn btn-info" onclick="showHelp()">Help</button>
+            <button class="btn btn-danger" onclick="exitApp()">Exit</button>
+        </div>
+    </div>
+</nav>
+
+<div class="container mt-4">
+
+    <!-- LOGIN -->
+    <div id="loginBox" class="card p-3 mb-4">
+        <h4>Login</h4>
+        <input id="username" class="form-control mb-2" placeholder="Username">
+        <input id="password" type="password" class="form-control mb-2" placeholder="Password">
+        <button class="btn btn-primary" onclick="login()">Login</button>
+    </div>
+
+    <!-- HELP -->
+    <div class="card p-3 mb-4" id="helpBox" style="display:none;">
+        <h4>Help</h4>
+        <p id="helpText"></p>
+    </div>
+
+    <!-- MAIN APP -->
+    <div id="app" style="display:none;">
+
+        <!-- ADD FORM -->
+        <div class="card p-4 mb-4">
+            <h4>Add Reservation</h4>
+
+            <input id="name" class="form-control mb-2" placeholder="Guest Name">
+            <input id="address" class="form-control mb-2" placeholder="Address">
+            <input id="contact" class="form-control mb-2" placeholder="Contact">
+
+            <select id="room" class="form-control mb-2">
+                <option value="">Select Room</option>
+                <option value="Standard">Standard</option>
+                <option value="Deluxe">Deluxe</option>
+                <option value="Suite">Suite</option>
+            </select>
+
+            <input type="date" id="checkin" class="form-control mb-2">
+            <input type="date" id="checkout" class="form-control mb-2">
+
+            <button class="btn btn-success" onclick="addReservation()">Add</button>
+        </div>
+
+        <!-- REPORT -->
+        <div class="card p-3 mb-4">
+            <h4>Reports</h4>
+            <button class="btn btn-warning" onclick="loadCount()">Total Reservations</button>
+            <h5 id="countResult"></h5>
+        </div>
+
+        <!-- TABLE -->
+        <div class="card p-3">
+            <h4>Reservations</h4>
+            <button class="btn btn-info mb-2" onclick="loadReservations()">Refresh</button>
+
+            <table class="table table-striped">
+                <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Name</th>
+                    <th>Room</th>
+                    <th>Check In</th>
+                    <th>Check Out</th>
+                    <th>Bill</th>
+                    <th>Action</th>
+                </tr>
+                </thead>
+                <tbody id="tableBody"></tbody>
+            </table>
+        </div>
+
+    </div>
+
+</div>
+
+<script>
+
+    // API URLs
+    const API = "http://localhost:8080/api/reservations";
+    const BILL_API = "http://localhost:8080/api/bill";
+    const REPORT_API = "http://localhost:8080/api/reports";
+    const HELP_API = "http://localhost:8080/api/help";
+
+    // LOGIN
+    function login(){
+
+        fetch("http://localhost:8080/api/login",{
+            method:"POST",
+            headers:{"Content-Type":"application/json"},
+            body: JSON.stringify({
+                username: username.value,
+                password: password.value
+            })
+        })
+            .then(res=>res.text())
+            .then(data=>{
+                if(data==="SUCCESS"){
+                    alert("Login Successful");
+                    loginBox.style.display="none";
+                    app.style.display="block";
+                    loadReservations();
+                }else{
+                    alert("Invalid Login");
+                }
+            });
+    }
+
+    function addReservation(){
+
+        const guestName = document.getElementById("name").value.trim();
+        const address = document.getElementById("address").value.trim();
+        const contact = document.getElementById("contact").value.trim();
+        const roomType = document.getElementById("room").value;
+        const checkIn = document.getElementById("checkin").value;
+        const checkOut = document.getElementById("checkout").value;
+
+        // DEBUG (VERY IMPORTANT)
+        console.log("Guest Name:", guestName);
+
+        if(guestName === ""){
+            alert("Guest name required");
+            return;
+        }
+
+        fetch("http://localhost:8080/api/reservations",{
+            method:"POST",
+            headers:{
+                "Content-Type":"application/json"
+            },
+            body: JSON.stringify({
+                guestName: guestName,
+                address: address,
+                contact: contact,
+                roomType: roomType,
+                checkIn: checkIn,
+                checkOut: checkOut
+            })
+        })
+            .then(()=>{
+                alert("Reservation Added!");
+                loadReservations();
+            });
+    }
+
+    // LOAD
+    function loadReservations(){
+
+        fetch(API)
+            .then(res=>res.json())
+            .then(data=>{
+
+                let table = document.getElementById("tableBody");
+                table.innerHTML="";
+
+                data.forEach(r=>{
+
+                    table.innerHTML += `
+<tr>
+<td>${r.reservationId}</td>
+<td>${r.guestName}</td>
+<td>${r.roomType}</td>
+<td>${r.checkIn}</td>
+<td>${r.checkOut}</td>
+<td>
+<button class="btn btn-success btn-sm" onclick="getBill(${r.reservationId})">Bill</button>
+<button class="btn btn-secondary btn-sm" onclick="downloadBill(${r.reservationId})">Download</button>
+</td>
+<td>
+<button class="btn btn-danger btn-sm" onclick="deleteReservation(${r.reservationId})">Delete</button>
+</td>
+</tr>`;
+                });
+            });
+    }
+
+    // DELETE
+    function deleteReservation(id){
+        fetch(API+"/"+id,{method:"DELETE"})
+            .then(()=>{ alert("Deleted"); loadReservations(); });
+    }
+
+    // BILL
+    function getBill(id){
+        fetch(BILL_API+"/"+id)
+            .then(res=>res.text())
+            .then(data=> alert("Total Bill: LKR " + data));
+    }
+
+    // DOWNLOAD BILL
+    function downloadBill(id){
+
+        fetch(BILL_API+"/"+id)
+            .then(res=>res.text())
+            .then(data=>{
+
+                let content = "Reservation ID: "+id+"\nTotal Bill: LKR "+data;
+
+                let blob = new Blob([content], { type: "text/plain" });
+
+                let a = document.createElement("a");
+                a.href = URL.createObjectURL(blob);
+                a.download = "bill.txt";
+                a.click();
+            });
+    }
+
+    // REPORT
+    function loadCount(){
+        fetch(REPORT_API+"/count")
+            .then(res=>res.text())
+            .then(data=>{
+                countResult.innerText = "Total Reservations: " + data;
+            });
+    }
+
+    // HELP
+    function showHelp(){
+        fetch(HELP_API)
+            .then(res=>res.text())
+            .then(data=> alert(data));
+    }
+
+    // EXIT
+    function exitApp(){
+        if(confirm("Exit system?")){
+            document.body.innerHTML="<h2 style='text-align:center'>System Closed</h2>";
+        }
+    }
+
+</script>
+
+</body>
+</html>
